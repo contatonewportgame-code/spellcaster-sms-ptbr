@@ -1,0 +1,177 @@
+===============================================================================
+                     SPELLCASTER (SEGA MASTER SYSTEM)
+                     VERSÃO BRASILEIRA - 100% EM PORTUGUÊS
+===============================================================================
+Autor e Desenvolvedor: Cristiano Mariano
+Selo / Marca: Newportgame — Preservação e Localização de Jogos Retrô
+Data de Lançamento: 2026
+Plataforma: Sega Master System / Sega Mark III
+===============================================================================
+
+-------------------------------------------------------------------------------
+📖 1. SOBRE O PROJETO
+-------------------------------------------------------------------------------
+SpellCaster (conhecido no Japão como Kujaku Ō / 孔雀王) é um dos jogos mais 
+ambiciosos do Sega Master System, misturando aventura gráfica em primeira pessoa 
+com fases de ação rápida e mitologia japonesa.
+
+Esta versão brasileira foi desenvolvida com engenharia reversa avançada em 
+baixo nível, reconstruindo a ROM de forma limpa e nativa, respeitando cada 
+detalhe da arquitetura original de fábrica da Sega (Z80 e VDP).
+
+Destaques da Localização:
+* 100% dos Diálogos da História Traduzidos: 478 caixas de texto abrangendo toda 
+  a jornada do início ao fim (incluindo a cena emocionante da guerreira Regina, 
+  a Nave Espacial Ameno, o Monte Minakami e a descida a Yomotsu).
+* Tipografia Completa com 11 Acentos + Hífen Nativo: Desenvolvido com injeção 
+  híbrida de fontes em 1bpp e blocos gráficos comprimidos Planar RLE da Sega.
+* 100% dos Menus e Submenus Adaptados: Todas as 88 opções de aventura e navegação 
+  calibradas na regra estrita de 8+8 caracteres do console (sem cortes feios).
+* HUD 100% Nativo sem Ganchos: Placar de "VIDA 20", "ENER 20", "ATAQ" e "DEFS" 
+  desenhado na memória de vídeo original sem hooks de Assembly instáveis (zero travamentos).
+* Gráficos do Cenário em Pixel Art (Yakisoba): A placa original em japonês da 
+  barraca da vila de Izumo foi descompactada, desenhada em pixel art e recomprimida 
+  no formato nativo Planar RLE 4BPP da Sega.
+* Restauração Histórica: Resgatadas 10 páginas de diálogos e tutoriais da 
+  batalha final que haviam sido amputadas pela Sega americana em 1989.
+* Fim do Bug de Fábrica: Corrigido o famoso erro de QA "??07D??" esquecido 
+  pela Sega no Templo do Cume, substituído pelo canônico "NADA PARA PEGAR AQUI.".
+* Epílogo e Créditos Traduzidos: Encerramento completo em português com os 
+  cargos da equipe traduzidos e selado com a assinatura oficial na abertura da esteira:
+  "VERSÃO BR: CRISTIANO MARIANO - NEWPORTGAME".
+
+-------------------------------------------------------------------------------
+💿 2. FICHA TÉCNICA DA ROM E ARQUIVO DO PATCH
+-------------------------------------------------------------------------------
+* Nome do Patch: SpellCaster (PT-BR) [Newportgame].ips
+* Formato do Patch: IPS (Padrão Internacional)
+
+ROM Base Recomendada para Aplicação (Padrão No-Intro):
+* Nome do Arquivo: SpellCaster (USA, Europe).sms
+* Tamanho: 524.288 bytes (512 KB / 4 Megabits cravados)
+* CRC32: 36729ED7
+
+-------------------------------------------------------------------------------
+🛠️ 3. COMO APLICAR O PATCH (.IPS)
+-------------------------------------------------------------------------------
+No Computador (Windows / Linux / Mac):
+1. Baixe o programa Lunar IPS (LIPS) ou Floating IPS (Flips).
+2. Clique no botão "Apply IPS Patch".
+3. Selecione o arquivo "SpellCaster (PT-BR) [Newportgame].ips".
+4. Selecione a sua ROM original limpa "SpellCaster (USA, Europe).sms".
+5. Uma nova ROM traduzida será gerada pronta para jogar!
+
+Pelo Navegador (Sem instalar nada - Celular ou PC):
+1. Acesse o site: https://www.marcrobledo.com/RomPatcher.js/
+2. No campo "ROM file", carregue sua ROM original limpa (.sms).
+3. No campo "Patch file", carregue o arquivo .IPS.
+4. Clique em "Apply patch" e baixe a ROM traduzida.
+
+-------------------------------------------------------------------------------
+🕹️ 4. ONDE JOGAR (COMPATIBILIDADE TESTADA)
+-------------------------------------------------------------------------------
+Emuladores Recomendados:
+* PC / Mac: Emulicious (altamente recomendado - precisão de ciclo perfeita para SMS), 
+  Kega Fusion, BlastEm ou RetroArch (Cores: Genesis Plus GX ou Gearsystem).
+* Android: RetroArch, Nostalgia.GG ou MD.emu.
+
+Em Hardware Real (Consoles Originais):
+* Compatível com Master System I, II, III (Tec Toy) e consoles importados 
+  (Master System / Mark III) via cartuchos flash (Everdrive / Master Everdrive / Mega Everdrive).
+* A ROM roda perfeitamente em 60 Hz (NTSC) ou 50 Hz (PAL), com áudio PSG padrão 
+  ou orquestrado via chip de Som FM (Yamaha YM2413).
+
+-------------------------------------------------------------------------------
+☕ 5. APOIE ESTE E FUTUROS PROJETOS (DOAÇÃO VOLUNTÁRIA)
+-------------------------------------------------------------------------------
+Este projeto é 100% GRATUITO e foi feito por amor à preservação histórica dos 
+videogames e à comunidade do Sega Master System no Brasil.
+
+Foram dezenas de madrugadas de engenharia reversa em baixo nível no Z80/VDP, 
+descompressão gráfica e calibração milimétrica de memória.
+
+Se você gostou desta tradução e gostaria de apoiar o autor ou incentivar o 
+lançamento de novos clássicos traduzidos, qualquer contribuição voluntária via Pix 
+é muito bem-vinda e ajuda a manter a chama retrô acesa!
+
+* Chave Pix (E-mail): contato.newportgame@gmail.com
+* Titular: Cristiano Mariano
+* Identificação: Doação para Projeto de Tradução / Newportgame
+
+-------------------------------------------------------------------------------
+📬 6. CONTATO E FEEDBACK
+-------------------------------------------------------------------------------
+* E-mail oficial: contato.newportgame@gmail.com
+* Newportgame — Preservação, ROM Hacking e Localização de Clássicos
+
+💻 Para Desenvolvedores e Pesquisadores: Toda a documentação técnica de baixo nível 
+(Compêndio Master System, Protocolo de Engenharia) e a suíte completa de ferramentas em 
+Python estão abertas para estudo no repositório oficial da Newportgame no GitHub.
+
+Obrigado por jogar e reviver essa lenda dos 8-bits em nosso idioma!
+===============================================================================
+
+-------------------------------------------------------------------------------
+📋 ANEXO: TABELA DE CARACTERES UNIVERSAL (SpellCaster.tbl)
+-------------------------------------------------------------------------------
+Crie um arquivo chamado "SpellCaster.tbl" na pasta do jogo caso queira inspecionar 
+o texto da ROM em visualizadores hexadecimais clássicos (WindHex, CrystalTile2):
+
+00= 
+01=!
+07='
+08=-
+0A=Ô
+0B=Ú
+0C=[VIRGULA]
+0D=[TAG0D]
+0E=[PAUSA]
+0F=Í
+10=[TAG10]
+11=[TAG11]
+12=[TAG12]
+13=[TAG13]
+14=[TAG14]
+16=[TAG16]
+18=[TAG18]
+1A=[LOCUTOR]
+1B=Õ
+1C=[ASPAS1]
+1D=Â
+1E=[ASPAS2]
+1F=?
+20=Ã
+21=A
+22=B
+23=C
+24=D
+25=E
+26=F
+27=G
+28=H
+29=I
+2A=J
+2B=K
+2C=L
+2D=M
+2E=N
+2F=O
+30=P
+31=Q
+32=R
+33=S
+34=T
+35=U
+36=V
+37=W
+38=X
+39=Y
+3A=Z
+3B=Á
+3C=Ç
+3D=Ó
+3E=É
+43=Ê
+FC FF=[FIM]
+FD=[PULA]
+===============================================================================

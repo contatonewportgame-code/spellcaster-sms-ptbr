@@ -1,0 +1,135 @@
+===============================================================================
+               MASTER PROTOCOL V15.0: Project SpellCaster (SMS) PT-BR
+               DEFINITIVE BRAZILIAN VERSION (GOLD MASTER - 100% TRANSLATED)
+===============================================================================
+This document is the "Technical Bible and Single Source of Truth" for the 
+translation project. It gathers 100% of the ROM architecture, reverse-engineering 
+history, overcome hardware pitfalls (Z80/VDP), the 11 Accents System and Native 
+Hyphen, Bank 02 Credit Fonts, the Forensic Laboratory Protocol, and the 
+Shielded Triad Pipeline.
+
+Localization & Reverse Engineering: Cristiano Mariano — Newportgame
+
+-------------------------------------------------------------------------------
+📍 1. TECHNICAL MAPPING AND ROM ARCHITECTURE
+-------------------------------------------------------------------------------
+* Base ROM: "SpellCaster (USA, Europe).sms" (512 KB / 524,288 bytes / 4 Megabits).
+* Generated ROM: "SpellCaster (PT-BR).sms" (Pure Translation - EXACTLY 524,288 bytes).
+
+* Custom Dialog Encoding & The 11 Accents + Official Hyphen System:
+  - Alphanumeric Base: A = 0x21 (B=0x22... Z=0x3A, Space=0x00, '=0x07, ?=0x1F, !=0x01).
+  - The 11 Approved Historical Accents:
+    * Á = 0x3B (Tile 59 - Bank 12 1bpp | 0x33980)
+    * Ç = 0x3C (Tile 60 - Bank 12 1bpp | 0x33988)
+    * Ó = 0x3D (Tile 61 - Bank 12 1bpp | 0x33990)
+    * É = 0x3E (Tile 62 - Bank 12 1bpp | 0x33998)
+    * Ê = 0x43 (Tile 67 - Bank 12 1bpp | 0x339C0)
+    * Ã = 0x20 (Tile 32 - Bank 19 Planar RLE | 0x4F35E)
+    * Í = 0x0F (Tile 15 - Bank 19 Planar RLE | 0x4F35E - Dynamic Clone of Tile 41)
+    * Ú = 0x0B (Tile 11 - Bank 19 Planar RLE | 0x4F35E)
+    * Õ = 0x1B (Tile 27 - Bank 19 Planar RLE | 0x4F35E - Edge-to-edge tilde line)
+    * Â = 0x1D (Tile 29 - Bank 19 Planar RLE | 0x4F35E)
+    * Ô = 0x0A (Tile 10 - Bank 19 Planar RLE | 0x4F35E - The 11th Official Accent!)
+  - The Approved Native Hyphen:
+    * '-' = 0x08 (Tile 08 - Bank 19 Planar RLE | 6px centered bar: 0x7E 0x7E).
+      Eliminates double spaces and standardizes words like BEM-VINDO and JUNTE-SE.
+
+  ⚠️ GOLDEN RULES OF TEXT AND VRAM:
+     - Byte 0x41 (ASCII 'A') prints a small number "8" on screen (The Wall of 8).
+     - Byte 0x37 MUST NEVER be used as a period! 0x37 is the letter 'W'.
+     - Dialogue periods are drawn AUTOMATICALLY by the pause tag <0E>. 
+       Never place punctuation (!) before <0E> to avoid generating "!." on screen.
+     - Official Sega Ellipsis: Created via triple sequence <0E><0E><0E>, 
+       generating a continuous and solemn pause without broken periods.
+     - 17-Column Border Ceiling: No line in portrait windows (<02>) 
+       may exceed 17 characters, to prevent overlapping Kane's portrait.
+     - Phantom Symbol Effect: NEVER inject pixels into VRAM outside the range read by 
+     the Z80 loader. Exceeding the BC register count causes the VDP to ignore the matrix.
+
+* Memory Mapping by Banks:
+
+  1. BANK 0 (0x00000 - 0x03FFF) - 100% SEGA FACTORY ORIGINAL:
+     - DISCOVERY: Bank 0 has ZERO free bytes (clogged with machine code).
+     - STRICTLY PROHIBITED: Creating external Z80 hooks or trampolines to Slots 1 and 2.
+     - CRITICAL SYSTEM ROUTINES (READ-ONLY):
+       * 0x0375 to 0x03A5: Sega's native Planar RLE graphics decompression routine.
+     - DIRECTIVE: In the pure translation ROM, Bank 0 remains 100% PURE and ORIGINAL.
+
+  2. BANK 1 AND BANK 2 (0x04000 - 0x0BFFF): Title Screen and End Credits Font:
+     - 0x07AC0 (Bank 1): Title screen adapted with "VERS$O BR - NEWPORTGAME".
+     - 0x0B6A3 (Bank 2): The "Golden Hack" on 1bpp ending fonts (unused ASCII slots):
+       * É = '#' (Tile 0x03 | 0x0B6BB)
+       * Ã = '$' (Tile 0x04 | 0x0B6C3)  <-- Used to seal the Title Screen with "VERSÃO"!
+       * Ç = '%' (Tile 0x05 | 0x0B6CB)
+       * Ê = '&' (Tile 0x06 | 0x0B6D3)
+       * Á = '<' (Tile 0x1C / 28 | 0x0B783)
+
+  3. BANK 5 (0x14000 - 0x17FFF): Synchronized HUD, Pause Menu, ATAQ, and DEFS:
+     - Native font table at 0x178E8 to 0x17948 (96 bytes / 12 factory-untouched tiles).
+     - The Law of Twin HUD Tables (Symmetrical Sync between Action and Pause):
+       * 0x17A58 / 0x17A60: Forest Table (VIDA 20 and ENER 20).
+       * 0x17B50 / 0x17B6A / 0x17B9E / 0x17BB8: Pause Table (VIDA 20 and ENER 20 in 4 letters).
+     - Pause Menu 8x16 Box Engineering:
+       * Box 1 (Weapons): Surgical "ATAQ". Upright 'T', and 'Q' with 1px breathing room (Balanced kerning).
+       * Box 2 (Armor): Approved "DEFS" (Sega's native S restored).
+       * Pixels allocated strictly within the 0x179D0 to 0x17A00 ranges revealed by VDP Loader.
+
+  4. BANK 12 (0x30000 - 0x33FFF): Dialogue, Item, and NPC Oasis (100% Restored):
+     - Pointer Table at 0x30000 (IDs 0 to 260) with dynamic recalculation.
+     - Oasis Area at 0x3020B (unlimited dynamic space for text expansion).
+     - Total Restoration of Screens Amputated by Sega of America:
+       * Restored 10 crucial pages (<FC>) for Yomotsu, Boatman, Amano, Izanami, and Daikak.
+       * Highlight: The Complete Sacred 11-Screen Tutorial of the final battle (ID 54) reconstructed.
+
+  5. BANK 17 (0x44000 - 0x47FFF): Accented Epilogue and Cinematic Credits:
+     - 0x46546 to 0x46856 (784 bytes): 100% accented Epilogue lines via Bank 02.
+     - 0x46856 to 0x4697E (298 byte limit): Sega's Continuous Credits Flow:
+       * Block format: [HEX_SIZE][Y_POSITION][TEXT][0xFE_PAUSES].
+       * Approved Double Spacing (\xFE\xFE) restored to separate roles with an empty blank line.
+       * Solemn Opening: "VERSÃO BR: CRISTIANO MARIANO" was moved to the TOP of the treadmill, guaranteeing full reading time before game reset.
+       * ILUMINADOR Glitch Fixed: Header set to 0x0A, eliminating the 0xFE phantom pixel.
+
+  6. BANK 18 (0x48000 - 0x4BFFF): The Z80 VDP Loader Engine:
+     - Forensic Discovery: Machine code at 0x488FB loads graphics into VRAM $2380.
+     - Incontestable proof of where the VDP fetches Pause Menu pixels (Bank 5).
+
+  7. BANK 19 (0x4EC7E to 0x4F1FE and RLE Block 0x4F200+): Menus & Planar RLE Block:
+     - Adventure menus fixed at 16 bytes (8+8). "MARS" magic standardized.
+     - Planar RLE Surgery (0x4F200 to 0x4F35E): Houses complementary accents Ã, Í, Ú, Õ, Â, Ô and Native Hyphen (-) on Tile 0x08.
+
+  8. BANK 24 (0x60000 - 0x63FFF): Compressed Izumo Scenario (Yakisoba):
+     - Physical offset 0x6158E. Y-A-K-I-S-O-B-A pixel art recompressed with positive slack.
+
+  9. BANKS 30 AND 31 (0x78000 - 0x7FFFF): Story Parts 1 and 2 (479 Dialogues):
+     - 100% accented dialogues, with all lines calibrated against portrait overflow (max 17 col).
+     - THE END OF BUG "??07D??": The infamous debug stub forgotten by Sega of America at Summit Temple (Offset 499154) was exterminated and replaced by the canonical "NADA PARA PEGAR AQUI.".
+
+-------------------------------------------------------------------------------
+🛡️ 2. LABORATORY PROTOCOL AND THE 4 SECURITY STEPS (SHIELDED PIPELINE)
+-------------------------------------------------------------------------------
+Strictly prohibited: Injecting modifications based on theoretical assumptions.
+
+Every improvement follows the MANDATORY 4-STEP FLOW:
+
+[STEP 0: THE FORENSIC LABORATORY (laboratorio.py)]
+  • 1-byte univariate tests, binary bisection, and automated isolated ROM generation.
+  • PROHIBITED to alter production files without hardware proof (Tilemap/Debugger) in Step 0.
+
+[STEP 1: ACTIVE ACCUMULATIVE BENCH (modificar.py)]
+  • Controlled environment for prototyping and fine-tuning active gameplay.
+
+[STEP 2: HIGH-PRECISION EMULATION VALIDATION (Emulicious)]
+  • Mandatory testing in real gameplay: movement, ladders, bosses, HUD, and credit treadmill.
+
+[STEP 3: GOLD MASTER COMPILER CONSOLIDATION]
+  • Definitive merge into the Master Compiler ('tradutor_mestre_v10.py') via secure string slicing.
+  • 'modificar.py' and 'laboratorio.py' are immediately cleaned for the next cycle.
+
+-------------------------------------------------------------------------------
+🔁 3. THE MANDATORY EXECUTION TRIAD FOR PURE TRANSLATION
+-------------------------------------------------------------------------------
+Every compilation session of the translated version MUST execute the official flow:
+
+```bash
+clear
+python3 tradutor_mestre_v10.py

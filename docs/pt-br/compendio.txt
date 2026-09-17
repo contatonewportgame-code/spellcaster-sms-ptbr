@@ -1,0 +1,387 @@
+===============================================================================
+                          O COMPÊNDIO MASTER SYSTEM
+     Tratado Universal de Engenharia Reversa, Arquitetura Z80/VDP, Física
+                   e Localização de ROMs da Sega (8-Bits)
+===============================================================================
+Autor e Desenvolvedor: Cristiano Mariano — Newportgame
+Plataforma Alvo: Sega Master System / Sega Mark III / Game Gear
+Escopo: Metodologia Programática em Python, Análise de Hardware e Tratado de Engenharia Reversa
+
+===============================================================================
+                             SUMÁRIO EXECUTIVO
+===============================================================================
+CAPÍTULO 1: A ANATOMIA DO HARDWARE SEGA 8-BITS (Z80, VDP E MAPEADORES)
+CAPÍTULO 2: O ECOSSISTEMA DE TEXTO E A ILUSÃO DO ASCII
+            (O Muro do 8, os Deltas Relativos, Diacríticos e Tipografia 8x16)
+CAPÍTULO 3: ENGENHARIA DE MEMÓRIA DINÂMICA (Ponteiros Little-Endian, Oásis e Dados Órfãos)
+CAPÍTULO 4: PROCESSAMENTO GRÁFICO E O MOTOR PLANAR RLE DA SEGA
+CAPÍTULO 5: O PIPELINE PROGRAMÁTICO MODERNO (A Morte do Hex Editor e a Trava de Integridade)
+CAPÍTULO 6: SUÍTE FORENSE E O ARSENAL DOS MÉTODOS DE INVESTIGAÇÃO
+CAPÍTULO 7: PROTOCOLO FORENSE ANTI-CRASH E DEPURAÇÃO EM HARDWARE/EMULAÇÃO
+CAPÍTULO 8: ARQUITETURA AVANÇADA DE VRAM, LOADERS Z80 E INTERFACE
+CAPÍTULO 9: ENGENHARIA DE FÍSICA Z80, SUBPIXELS, EQUAÇÃO DE CÂMERA E DINÂMICA DE ENTIDADES
+===============================================================================
+
+-------------------------------------------------------------------------------
+CAPÍTULO 1: A ANATOMIA DO HARDWARE SEGA 8-BITS
+-------------------------------------------------------------------------------
+Modificar ou localizar software para o Sega Master System difere estruturalmente 
+de trabalhar em computadores clássicos de sua época (como MSX ou IBM PC). Não 
+existe sistema operacional, não existe buffer de texto nativo de fábrica e não 
+existe BIOS que carregue alfabetos padronizados. Toda a lógica de execução é 
+controlada diretamente pelo microprocessador Zilog Z80 e pelo coprocessador de 
+vídeo VDP (Video Display Processor).
+
+1.1 O Mapeamento de Memória do Z80 e o Mapeador Sega (Sega Mapper)
+O processador Z80 possui um barramento de endereçamento de 16-bits, permitindo-lhe 
+enxergar diretamente apenas 64 KB de espaço linear de memória por vez (endereços 
+$0000 a $FFFF). Para possibilitar o lançamento de cartuchos com capacidades 
+superiores a 48 KB (como cartuchos de 128 KB, 256 KB e 512 KB / 4 Megabits), a Sega 
+desenvolveu o chip de chaveamento bancário Sega Standard Mapper:
+    • Slot 0 ($0000 a $3FFF / 16 KB): Mapeado obrigatoriamente no Banco 0 físico 
+      da ROM. Contém os vetores de interrupção (RST, NMI, INT), rotinas críticas 
+      de inicialização, controladores de vídeo e o loop principal do motor.
+    • Slot 1 ($4000 a $7FFF / 16 KB): Banco chaveável (frequentemente fixado no 
+      Banco 1 ou alternado para dados de animação e lógica secundária).
+    • Slot 2 ($8000 a $BFFF / 16 KB): O banco de dados dinâmico. É aqui que o motor 
+      chaveia os bancos altos da ROM física para carregar tabelas de diálogo, 
+      dados de fases, tabelas de IA e assets específicos de cada tela.
+    • RAM do Sistema ($C000 a $DFFF / 8 KB) e Espelho ($E000 a $FFFF): Área volátil 
+      de variáveis, matrizes de entidades, pilhas de chamada e buffers de tela.
+    • Registradores do Mapeador ($FFFD, $FFFE, $FFFF): Endereços no topo da RAM 
+      utilizados pelo Z80 para chavear qual banco de 16 KB da ROM física será 
+      refletido instantaneamente nos Slots 0, 1 e 2, respectivamente.
+
+1.2 A Linha Vermelha do Banco 0
+Em ROMs comerciais de 512 KB, o Banco 0 possui rigorosamente ZERO bytes livres. 
+A engenharia da Sega utilizou cada ciclo de clock e cada byte disponível para 
+vetores de salto, rotinas de VBLANK e controladores de hardware.
+    • LEI INVIOLÁVEL: Nunca tente abrir espaço no Banco 0 injetando novos scripts 
+      extensos ou criando trampolins desordenados para os Slots 1 e 2. Alterações 
+      no Banco 0 devem ser estritamente in-place, preservando os alinhamentos e 
+      otimizando instruções existentes ciclo a ciclo.
+
+1.3 A VRAM e os Atributos de Tile
+O chip de vídeo do Master System gerencia 16 KB de memória de vídeo dedicada (VRAM). 
+A imagem na tela é composta por uma matriz de blocos gráficos de 8x8 pixels 
+(denominados Tiles). Uma linha horizontal da tela em resolução padrão (256x192) 
+é formada por 32 colunas de tiles.
+Cada célula na Tabela de Nomes (Name Table / Tilemap) consome exatamente 2 bytes:
+    [Byte Menor: Tile ID (0 a 255)] + [Byte Maior: Atributos de Hardware]
+    • Bit 0 (MSB do Tile ID): Permite endereçar a segunda página de padrões (tiles 256 a 511 / VRAM $2000+).
+    • Bit 1 (Flip Horizontal - hflip): Inverte o desenho horizontalmente (espelhamento X).
+    • Bit 2 (Flip Vertical - vflip): Inverte o desenho de cabeça para baixo (espelhamento Y).
+    • Bit 3 (Seleção de Paleta): 0 = Paleta de Sprites / Fundo 0; 1 = Paleta de Cenário / Fundo 1.
+    • Bit 4 (Prioridade): Determina se o tile de fundo fica na frente ou atrás dos sprites.
+
+-------------------------------------------------------------------------------
+CAPÍTULO 2: O ECOSSISTEMA DE TEXTO E A ILUSÃO DO ASCII
+-------------------------------------------------------------------------------
+2.1 A Ilusão do ASCII e o Fenômeno do "Muro do 8"
+No padrão internacional de computadores (ASCII), a letra 'A' maiúscula é codificada 
+pelo byte hexadecimal 0x41 (decimal 65). Quando um programador inexperiente abre 
+uma ROM de Master System num editor binário comum e escreve texto ocidental em ASCII, 
+a tela do console renderiza invariavelmente uma sequência caótica de números "8" pequenos.
+Causa Raiz de Hardware:
+    1. O processador de vídeo não lê caracteres textuais; ele lê Índices de Tiles na VRAM.
+    2. Ao localizar jogos do mercado japonês (que utilizavam silabários Katakana/Hiragana), 
+       os desenvolvedores desenhavam o alfabeto latino a partir de um índice arbitrário 
+       de vídeo — convencionalmente o índice 0x21 (decimal 33).
+    3. Consequentemente: Tile 0x21 = 'A'; Tile 0x22 = 'B' ... Tile 0x3A = 'Z'.
+    4. Nos índices seguintes (pós-alfabeto), a Sega desenhava números e ícones de status.
+    5. No índice 0x41 (65 decimal), residia o desenho do numeral "8" de fonte reduzida.
+    6. Ao enviar o byte ASCII 0x41, a VDP executa a instrução física: "Desenhe o Tile 65", 
+       estampando o número 8 na tela. Este fenômeno é denominado O Muro do 8.
+
+2.2 A Superação dos Diacríticos: O Método Híbrido de Injeção
+Historicamente, as localizações comerciais da década de 90 optavam pela omissão total 
+de acentuação devido ao alto risco de corrupção visual na VRAM compartilhada.
+A Metodologia Newportgame superou esse paradigma através da Injeção Híbrida:
+    1. Diacríticos de Alta Frequência (Banco de Texto 1bpp): Alocação direta em 
+       índices vagos imediatamente pós-alfabeto (Tiles 59 a 62 e 67).
+    2. Diacríticos Secundários (Blocos Compactados Planar RLE): Quando a rotina de 
+       cópia nativa do Banco 0 para na barreira do Tile 67, os caracteres 
+       restantes são injetados em tiles de pontuação obsoletos via descompressão 
+       em RAM, modificação de pixel art e recompressão com folga positiva.
+    3. O resultado garante suporte tipográfico completo a idiomas latinos sem a 
+       necessidade de reprogramar a máquina de renderização do Banco 0.
+
+2.3 A Descoberta Matemática de Tabelas (O Método dos Deltas Relativos)
+Para determinar a codificação de texto de qualquer ROM sem código-fonte, emprega-se 
+a Busca Matemática Relativa:
+A distância ordinal (Delta) entre as letras do alfabeto é uma constante universal 
+(B - A = 1; C - A = 2). Calculando a matriz de deltas de palavras conhecidas do jogo 
+(ex: START, PASSWORD, OPTION), um algoritmo varre todas as 256 bases possíveis da 
+ROM até identificar a sequência matemática exata em tempo de execução.
+
+2.4 Tipografia 8x16, Emenda de Células e a Matemática do Kerning (Respiro de Pixel)
+Em interfaces gráficas avançadas, status, placares e molduras frequentemente utilizam 
+fontes grandes de 8x16 pixels compostas por dois tiles empilhados verticalmente:
+    [Tile Superior (Linha Y)] + [Tile Inferior (Linha Y+1)]
+Regras Fundamentais de Engenharia 8x16:
+    • A Emenda Perfeita (Seam Matching): O traço vertical que encerra no pixel 7 da 
+      matriz superior DEVE iniciar exatamente na mesma coluna do pixel 0 da matriz 
+      inferior. Qualquer deslocamento horizontal entre as matrizes cria degraus e 
+      sensação de letras desmembradas.
+    • A Lei do Kerning (Respiro Lateral): Cada célula de tile possui 8 pixels de 
+      largura (0 a 7). Se a letra 'A' toca o pixel 7 (borda direita) e a letra 'Q' 
+      inicia no pixel 0 (borda esquerda), a distância visual entre elas é ZERO, 
+      fazendo com que as letras se fundam na tela. Para garantir espaçamento 
+      harmônico de padrão arcade, a matriz da letra seguinte DEVE manter o pixel 0 
+      vazio (%01100110 / 0x66), gerando exatamente 1 pixel de respiro natural.
+
+-------------------------------------------------------------------------------
+CAPÍTULO 3: ENGENHARIA DE MEMÓRIA DINÂMICA (PONTEIROS, OÁSIS E DADOS ÓRFÃOS)
+-------------------------------------------------------------------------------
+3.1 A Estrutura de Ponteiros de 16-Bits
+As caixas de texto raramente são dispostas de forma sequencial na memória física. 
+O motor do jogo consulta uma Tabela de Ponteiros lógicos gravados no formato 
+Little-Endian do Z80 (o byte menos significativo antecede o byte mais significativo):
+    Endereço lógico Z80: $853A  ==>  Gravado na ROM como: [3A 85]
+
+3.2 A Arquitetura do "Oásis" de Memória
+Ao traduzir ou expandir diálogos, o volume de texto costuma crescer de 20% a 35%. 
+Forçar novas sentenças dentro do espaço exíguo do texto antigo acarreta truncamento 
+ou corrupção de código de máquina adjacente.
+A Solução do Oásis:
+    1. Identifica-se uma área contínua e segura da ROM (preenchida com 0xFF de fábrica 
+       ou reaproveitando um banco com dados descartados).
+    2. Escreve-se o novo corpo de texto linearmente nessa área protegida.
+    3. Fórmula Universal de Recálculo de Ponteiro Lógico (Slot 2):
+       Ponteiro_Lógico = (Endereço_Físico_ROM - Base_Física_Banco) + 0x8000
+    4. Redireciona-se a tabela de ponteiros original para que os IDs do jogo 
+       passem a apontar diretamente para as coordenadas do novo Oásis.
+
+3.3 Deduplicação de Mensagens de Sistema
+Muitos motores clássicos repetem strings idênticas de sistema dezenas de vezes 
+(ex: mensagens de recusa, avisos de erro ou falhas de comando repetidos para 
+cada evento do cenário).
+    • Engenharia de Deduplicação: Grava-se a string uma única vez no início do 
+      Oásis. Em seguida, programa-se o compilador para redirecionar todos os 
+      ponteiros duplicados da tabela para esse mesmo endereço físico. Esse 
+      procedimento recupera instantaneamente entre 4.000 e 8.000 bytes úteis na ROM.
+
+3.4 Arqueologia de Dados Órfãos e Stubs de Depuração de Fábrica
+Durante a localização comercial de jogos japoneses nos anos 80, desenvolvedores 
+frequentemente resumiam falas ou esqueciam gatilhos de tradução devido a prazos de prensagem:
+    • O Sinal de Pare ($FC $FF): O processador Z80 lê bytes de texto até encontrar o 
+      terminador de string. Ao encurtar um diálogo, programadores inseriam o terminador 
+      antes do final da frase original, deixando o restante do texto original japonês ou 
+      inglês esquecido após o terminador (Dados Órfãos / Orphaned Data).
+    • Stubs de Depuração (Padrão ??...??): Quando ferramentas de compilação da época 
+      não encontravam a tradução de uma mensagem específica no script, geravam 
+      automaticamente uma string de erro (ex: '??[ID_HEX]??') para alertar os testadores 
+      de QA. Em muitos cartuchos comerciais, esses stubs foram esquecidos e enviados 
+      para as fábricas. A engenharia reversa permite desenterrar o ID original e 
+      completar o roteiro canônico definitivo.
+
+-------------------------------------------------------------------------------
+CAPÍTULO 4: PROCESSAMENTO GRÁFICO E O MOTOR PLANAR RLE DA SEGA
+-------------------------------------------------------------------------------
+4.1 O Formato Sega Planar RLE (4BPP)
+O coprocessador VDP opera com 4 planos de bits (Bitplanes) para gerar até 16 cores 
+simultâneas por pixel. A Sega compactou essas texturas e fontes complexas em 4 fluxos 
+contíguos independentes (Plano 0, Plano 1, Plano 2 e Plano 3):
+    • Byte de Controle < 0x80: Modo Repetição (Run-Length). O próximo byte do 
+      fluxo é replicado N vezes na descompressão.
+    • Byte de Controle >= 0x80: Modo Literal. Copia os próximos (N & 0x7F) bytes 
+      diretamente do fluxo sem compactação.
+    • Byte 0x00: Terminador obrigatório que encerra o fluxo do plano de cor.
+    • Cada plano descompactado deve ter tamanho rigorosamente idêntico aos outros 
+      três, e a quantidade de bytes descompactados dividida por 8 determina o total 
+      exato de tiles de 8x8 recuperados.
+
+4.2 Injeção de Pixel Art In-Place e a Regra da Folga Positiva
+Para modificar gráficos ou matrizes de fontes compactadas:
+    1. Descompacta-se os 4 planos na memória RAM.
+    2. Modifica-se os pixels dos tiles desejados nos planos correspondentes.
+    3. Recompacta-se os 4 planos através do algoritmo canônico Sega Planar RLE.
+    4. Regra da Folga Positiva: O novo bloco compactado gerado deve ser menor ou 
+       igual ao tamanho do bloco original de fábrica. A folga restante é preenchida 
+       com bytes 0x00, mantendo todos os offsets físicos e ponteiros da ROM alinhados.
+
+-------------------------------------------------------------------------------
+CAPÍTULO 5: O PIPELINE PROGRAMÁTICO MODERNO (A MORTE DO HEX EDITOR)
+-------------------------------------------------------------------------------
+Modificar ROMs abrindo arquivos e digitando valores manualmente em editores 
+hexadecimais é uma prática arcaica, não versionável e suscetível a erros humanos 
+irreversíveis. O padrão da engenharia reversa apoia-se em um Pipeline Automatizado:
+    [ROM Original Limpa] ──> [Compilador Mestre em Python (1s)] ──> [ROM Final Homologada]
+
+5.1 A Armadilha do Slice no Python e a Trava de Integridade
+Um dos erros mais graves e silenciosos em engenharia de ROMs em Python reside no 
+comportamento do tipo bytearray ao atribuir fatias de dados.
+Se o desenvolvedor executar:
+    rom[0x40000 : 0x40038] = dados_com_tamanho_divergente
+O Python não preenche com zeros: ele deleta ou insere bytes, encolhendo ou expandindo 
+o tamanho do arquivo.
+    • O Efeito Catastrófico: Se uma ROM de 512 KB encolhe 1 único byte, todos os 
+      bancos posteriores são deslocados 1 posição para trás. O processador Z80 lê 
+      instruções corrompidas e trava o console em tela preta imediatamente.
+    • A Lei da Trava de Integridade: Toda compilação deve validar o tamanho cravado:
+      assert len(rom) == TAMANHO_ORIGINAL, "ROM corrompida por deslocamento de fatia!"
+
+-------------------------------------------------------------------------------
+CAPÍTULO 6: SUÍTE FORENSE E O ARSENAL DOS MÉTODOS DE INVESTIGAÇÃO
+-------------------------------------------------------------------------------
+A engenharia moderna exige a operação com metodologias forenses padronizadas:
+    1. Reconhecimento de Terreno: Varredura de blocos vazios contíguos (0x00/0xFF) 
+       banco por banco para identificação de Oásis e verificação do Banco 0.
+    2. Busca Matemática Relativa: Varredura por deltas em formato de 1 byte (linear) 
+       ou 2 bytes intercalados (padrão Name Table da VDP).
+    3. Autópsia de VDP Loaders (Anti-Símbolo Fantasma): Rastreamento de instruções 
+       Z80 de escrita na porta $BF ($4000-$7FFF) e mapeamento do registrador BC 
+       para descobrir exatamente qual endereço da ROM alimenta cada faixa da VRAM.
+    4. Rastreamento de Tilemaps de Interface e Janelas 2D: Cruzamento de leituras de VRAM com 
+       a ROM física para tradução de placares, caixas e menus nativos sem Assembly.
+    5. Estúdio Tipográfico 1:1 e 8x16: Conversão de matrizes de fontes em 1bpp/4bpp com 
+       renderização no terminal em escala real (meio-bloco CRT), modo 8x16 e simulador de kerning.
+    6. Caça de Texturas Planar RLE: Varredor algorítmico que descompacta todos os 
+       blocos gráficos da ROM e gera galerias visuais para inspeção de placas e artes.
+    7. Cirurgia Gráfica In-Place: Módulo de descompressão, injeção de matrizes e 
+       recompressão com cálculo automático de folga positiva.
+    8. Auditoria Total de Idioma e Caça a Stubs: Varredura simultânea decodificando diacríticos, 
+       cruzando contra dicionários de exclusão e caçando códigos esquecidos (??...??).
+    9. Isolador de Falhas por Bisseção Binária: Comparador diferencial que restaura 
+       um banco por vez da ROM limpa para identificar travamentos em segundos.
+
+-------------------------------------------------------------------------------
+CAPÍTULO 7: PROTOCOLO FORENSE ANTI-CRASH E DEPURAÇÃO EM EMULAÇÃO
+-------------------------------------------------------------------------------
+7.1 O Método da Bisseção Binária
+Se uma compilação travar em tela preta, o protocolo científico veta suposições:
+    1. Gera-se ROMs de teste restaurando faixas isoladas de bancos para o estado original.
+    2. A primeira ROM de teste que inicializar denuncia com precisão absoluta qual 
+       banco de dados provocou a anomalia.
+
+7.2 Depuração Avançada com Emulicious
+    • Análise do Registrador PC (Program Counter):
+        ◦ PC = $0000: Reset forçado por execução de opcode ilegal ou salto corrompido.
+        ◦ Loop fechado (JR NZ, -$02 ou leituras repetidas em $BF): CPU aguardando 
+          terminador de string (ex: 0xFC 0xFF) ou interrupção de VDP apagada.
+    • Menu Tools -> Tilemap Viewer / Tile Viewer: Inspecione o cenário completo renderizado 
+      pela VDP. O campo "Pixel Source" denuncia o endereço físico exato de qualquer tile 
+      na ROM física, dispensando buscas manuais no escuro.
+
+-------------------------------------------------------------------------------
+CAPÍTULO 8: ARQUITETURA AVANÇADA DE VRAM, LOADERS Z80 E INTERFACE
+-------------------------------------------------------------------------------
+8.1 A Armadilha dos Tiles Compartilhados de Interface
+Em cartuchos comerciais de Master System, índices de VRAM imediatamente após o 
+alfabeto alfanumérico frequentemente NÃO são livres. Os desenvolvedores reutilizavam 
+esses slots para desenhar elementos de interface compartilhados:
+    • Peças de cantos e espessura da moldura de caixas de diálogo.
+    • Sombras e texturas de logotipo da tela de título.
+    • Ícones de cursor de seleção (JOGAR/SENHA) e setas piscantes de espera.
+    • Regra de Segurança: Jamais sobrescreva esses tiles sem auditar a Name Table. 
+      Alterar esses índices quebra molduras, apaga cursores e gera artefatos na tela.
+
+8.2 O Limite da Rotina de Cópia de Fontes na VRAM e o Efeito do Símbolo Fantasma
+O processador Z80 transfere blocos de fontes da ROM para a VRAM através de rotinas 
+em Assembly com contadores rígidos de repetição:
+    LD HL, Endereço_Origem_ROM    ; Ponteiro da matriz na ROM
+    LD DE, Comando_VRAM_Destino   ; Ex: $6000 | VRAM $2000
+    LD BC, Quantidade_Bytes       ; Contador de repetição (ex: $0060 = 12 tiles)
+    CALL Rotina_Copia_VRAM
+    • O Efeito do Símbolo Fantasma: Gravar novos caracteres na ROM além do limite de 
+      bytes estipulado no registrador BC não altera o texto impresso; o Z80 encerra 
+      a cópia antes de ler esses bytes e a tela continuará exibindo o resíduo gráfico 
+      antigo presente na VRAM. Para injetar novos caracteres com sucesso, o desenvolvedor 
+      deve localizar exatamente qual rotina de carga alimenta aquela faixa de VRAM.
+
+8.3 A Lei da Simetria das Tabelas Gêmeas de Interface (Action vs. Pause HUDs)
+Muitos motores clássicos de 8-bits gerenciam múltiplos buffers de Name Table para 
+diferentes modos de jogo (ex: HUD horizontal na ação e HUD vertical empilhado no Menu de Pausa):
+    • A Armadilha da Desconexão: Modificar apenas a tabela do HUD de ação faz com que, 
+      ao pausar o jogo, a Name Table do menu de pausa continue lendo os índices antigos 
+      da Sega, gerando siglas deformadas e desalinhamentos.
+    • Regra da Simetria: Toda modificação estrutural de placares (ex: VIDA/ENER) deve 
+      ser refletida identicamente em todas as tabelas gêmeas do motor.
+
+8.4 Engenharia de Fluxo Contínuo de Encerramento (Créditos e Terminador de Reset)
+Em telas de créditos com rolagem vertical contínua sobre fundo preto, a máquina 
+interpreta um fluxo sequencial de blocos formatados em bytecode:
+    [Tamanho_String] [Coluna_X / Posição] [Texto_ASCII] [Pausas_0xFE] ... [Terminador_FF_00]
+    • O Controle de Espaçamento (\xFE): Cada byte 0xFE comanda uma pausa de frame (VBLANK) 
+      e o avanço de linha. A repetição dupla (\xFE\xFE) gera uma linha vazia de respiro 
+      entre os cargos (espaçamento duplo elegante). A ausência de pausas espreme todas 
+      as linhas na tela simultaneamente.
+    • O Teto do Buffer e a Abertura Solene: O buffer de créditos possui tamanho máximo 
+      fixo de hardware (ex: 298 bytes). O terminador de fábrica (FF 00) dispara a 
+      contagem regressiva de reset do console. Para garantir tempo nobre de leitura da 
+      assinatura oficial de localização, o bloco autoral deve ser posicionado na 
+      ABERTURA da esteira, permitindo leitura limpa antes do fluxo de cargos.
+
+-------------------------------------------------------------------------------
+CAPÍTULO 9: ENGENHARIA DE FÍSICA Z80, SUBPIXELS, CÂMERA E ENTIDADES
+-------------------------------------------------------------------------------
+9.1 Aritmética de Ponto Fixo de 16-Bits e Subpixels
+Personagens e projéteis em jogos de ação não se movem em coordenadas inteiras de 
+pixels. Se uma entidade se movesse 1 pixel inteiro a cada frame a 60 Hz, percorreria 
+60 pixels por segundo — uma velocidade incontrolável em uma tela de 256 pixels.
+Para criar acelerações suaves, o motor Z80 opera com Ponto Fixo de 16-Bits:
+    • Registrador L (Byte Menor): Fração de Subpixel (0 a 255).
+    • Registrador H (Byte Maior): Coordenada Real do Pixel na Tela (0 a 255).
+    • Par de Registradores DE: Vetor de velocidade do frame.
+    • A Equação de Deslocamento: HL_novo = HL_antigo + DE
+    O pixel visível (H) só avança quando o acumulador fracionário (L) atinge o 
+    transbordo de 256 ($80 + $80 = $100).
+
+9.2 A Equação da Câmera e o Cancelamento da Deriva Zero
+Em fases de rolagem contínua, quando o protagonista atinge a "zona morta" (Deadzone) 
+no centro da tela (ex: X = 128), a câmera deve começar a se deslocar para manter 
+o personagem enquadrado.
+A Sega implementa uma equação de cancelamento no manipulador de física:
+    Avanço_Visível = Velocidade_do_Personagem (DE) + Delta_da_Câmera (Buffer_RAM)
+    • No motor original: (+128 subpixels) + (-128 subpixels) = $0000.
+      A instrução RET Z encerra o cálculo, a coordenada de tela do personagem não é 
+      incrementada e o cenário é puxado para trás, criando a ilusão de corrida.
+    • A Armadilha da Aceleração: Se a velocidade do personagem for duplicada para 
+      2X (+256 subpixels), mas o gerador do buffer de câmera permanecer em 1X (-128 
+      subpixels), a soma resulta em +128 subpixels de sobra. O personagem sofre 
+      deriva contínua até escorregar para fora da tela.
+    • Lei da Deriva Zero: A taxa de alimentação do buffer de câmera DEVE ser 
+      rigorosamente simétrica à velocidade de deslocamento do protagonista.
+
+9.3 A Lei do Alcance Horizontal vs. Pulo Vertical
+Modificações empíricas em rotinas de pulo vertical frequentemente geram efeitos 
+catastróficos: o personagem fura o teto, atravessa o chão (tunneling) ou fica invisível.
+    • A Lei do Alcance de Salto: Distância_Horizontal = Velocidade_Horizontal * Tempo_no_Ar.
+    • Ao duplicar a velocidade horizontal da marcha, o personagem AUTOMATICAMENTE 
+      dobra o alcance horizontal do seu salto, cobrindo vãos enormes naturalmente, 
+      sem a necessidade de alterar drasticamente a gravidade ou a altura vertical.
+    • A Armadilha dos Saltos Longos de Assembly: Injetar rotinas extensas de pulo 
+      que realizam saltos relativos (JR) cegos atropela bytes vitais do motor 
+      responsáveis por atualizar a tabela de sprites da VDP, tornando o personagem 
+      invisível ou piscando. Modificações de impulso vertical devem ser estritamente 
+      in-place em exatos 3 bytes (JR Z + ADD HL, DE).
+
+9.4 A Proteção de Tripé (Arenas Estáticas) e o Isolamento de Chefes
+Em batalhas contra chefes, a câmera frequentemente trava em modo tripé estático sem rolagem:
+    • O motor original da Sega implementa uma flag de isolamento em sua rotina de 
+      deslocamento (ex: checagem LD A, (IX+offset); JR NZ, .pula_camera).
+    • Quando uma entidade opera em tela fixa com essa flag ativa, o motor salta por 
+      cima das compensações de câmera. Se um patch de aceleração sobrescrever essa 
+      checagem, o motor passa a aplicar deslocamentos fantasmas de câmera sobre o 
+      personagem travado no chão, criando um "efeito ímã" que o arrasta para os lados.
+    • Regra de Ouro: O isolamento de telas estáticas deve permanecer intacto para 
+      impedir que o movimento de chefes ou projéteis interfira na posição do jogador.
+
+9.5 Detecção Dinâmica de Fases via Registradores de Mapeamento
+Cartuchos de Master System utilizam o registrador de mapeamento do Slot 2 ($FFFF) 
+para chavear bancos de fases específicas (ex: bancos de chefes ou fases aquáticas).
+    • Ao inspecionar o valor contido em ($FFFF) na memória RAM, rotinas de física no 
+      Banco 0 podem detectar instantaneamente a fase ativa em tempo de execução, 
+      permitindo habilitar dinâmicas exclusivas (como aceleração total ou modo tripé) 
+      com 100% de isolamento cirúrgico e zero regressões em outras fases.
+
+===============================================================================
+              ASSINATURA TÉCNICA E CERTIFICAÇÃO DE METODOLOGIA
+===============================================================================
+Este documento consolida a metodologia comprovada em hardware real e emulação 
+de alta precisão da Newportgame. Ele estabelece a fundação científica universal 
+para iniciativas de preservação, tradução, física e engenharia reversa na 
+plataforma Sega Master System / Sega 8-Bits.
+
+Desenvolvido e homologado por: Cristiano Mariano — Newportgame.
+===============================================================================

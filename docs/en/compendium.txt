@@ -1,0 +1,311 @@
+===============================================================================
+                          THE MASTER SYSTEM COMPENDIUM
+     Universal Treatise on Reverse Engineering, Z80/VDP Architecture, Physics, 
+                   and Sega 8-Bit ROM Localization
+===============================================================================
+Author and Developer: Cristiano Mariano — Newportgame
+Target Platform: Sega Master System / Sega Mark III / Game Gear
+Scope: Programmatic Methodology in Python, Hardware Analysis, and Reverse Engineering Treatise
+
+===============================================================================
+                             EXECUTIVE SUMMARY
+===============================================================================
+CHAPTER 1: THE ANATOMY OF SEGA 8-BIT HARDWARE (Z80, VDP, AND MAPPERS)
+CHAPTER 2: THE TEXT ECOSYSTEM AND THE ASCII ILLUSION
+            (The Wall of 8, Relative Deltas, Diacritics, and 8x16 Typography)
+CHAPTER 3: DYNAMIC MEMORY ENGINEERING (Little-Endian Pointers, Oasis, and Orphaned Data)
+CHAPTER 4: GRAPHIC PROCESSING AND SEGA'S PLANAR RLE ENGINE
+CHAPTER 5: THE MODERN PROGRAMMATIC PIPELINE (The Death of the Hex Editor and the Integrity Lock)
+CHAPTER 6: FORENSIC SUITE AND THE ARSENAL OF INVESTIGATION METHODS
+CHAPTER 7: ANTI-CRASH FORENSIC PROTOCOL AND DEBUGGING IN HARDWARE/EMULATION
+CHAPTER 8: ADVANCED VRAM ARCHITECTURE, Z80 LOADERS, AND INTERFACE
+CHAPTER 9: Z80 PHYSICS ENGINEERING, SUBPIXELS, CAMERA EQUATION, AND ENTITY DYNAMICS
+===============================================================================
+
+-------------------------------------------------------------------------------
+CHAPTER 1: THE ANATOMY OF SEGA 8-BIT HARDWARE
+-------------------------------------------------------------------------------
+Modifying or localizing software for the Sega Master System differs structurally 
+from working on classic computers of its era (like the MSX or IBM PC). There is 
+no operating system, no factory text buffer, and no BIOS that loads standardized 
+alphabets. All execution logic is controlled directly by the Zilog Z80 microprocessor 
+and the VDP (Video Display Processor).
+
+1.1 Z80 Memory Mapping and the Sega Mapper
+The Z80 processor has a 16-bit address bus, allowing it to directly see only 64 KB 
+of linear memory space at a time ($0000 to $FFFF). To enable cartridges with 
+capacities greater than 48 KB (such as 128 KB, 256 KB, and 512 KB / 4 Megabits), 
+Sega developed the Sega Standard Mapper banking chip:
+    • Slot 0 ($0000 to $3FFF / 16 KB): Mapped obligatorily to physical Bank 0 
+      of the ROM. Contains interrupt vectors (RST, NMI, INT), critical initialization 
+      routines, video controllers, and the engine's main loop.
+    • Slot 1 ($4000 to $7FFF / 16 KB): Switched bank (frequently fixed to Bank 1 
+      or swapped for animation data and secondary logic).
+    • Slot 2 ($8000 to $BFFF / 16 KB): The dynamic database. This is where the engine 
+      switches the high ROM banks to load dialogue tables, stage data, AI tables, 
+      and screen-specific assets.
+    • System RAM ($C000 to $DFFF / 8 KB) and Mirror ($E000 to $FFFF): Volatile area 
+      for variables, entity arrays, call stacks, and screen buffers.
+    • Mapper Registers ($FFFD, $FFFE, $FFFF): Top RAM addresses used by the Z80 
+      to switch which 16 KB physical ROM bank is instantly reflected into Slots 0, 1, and 2.
+
+1.2 The Red Line of Bank 0
+In commercial 512 KB ROMs, Bank 0 has strictly ZERO free bytes. Sega's engineering 
+utilized every clock cycle and available byte for jump vectors, VBLANK routines, 
+and hardware controllers.
+    • INVIOLABLE LAW: Never attempt to free space in Bank 0 by injecting large new 
+      scripts or creating messy trampolines to Slots 1 and 2. Changes to Bank 0 must 
+      be strictly in-place, preserving alignments and cycle-optimizing existing instructions.
+
+1.3 VRAM and Tile Attributes
+The Master System video chip manages 16 KB of dedicated Video RAM (VRAM). 
+The screen image is composed of a matrix of 8x8 pixel graphical blocks (Tiles). 
+A horizontal screen line in standard resolution (256x192) consists of 32 tile columns.
+Each cell in the Name Table (Tilemap) consumes exactly 2 bytes:
+    [Lower Byte: Tile ID (0 to 255)] + [Upper Byte: Hardware Attributes]
+    • Bit 0 (Tile ID MSB): Addresses the second pattern page (tiles 256 to 511 / VRAM $2000+).
+    • Bit 1 (Horizontal Flip - hflip): Inverts the drawing horizontally (X mirroring).
+    • Bit 2 (Vertical Flip - vflip): Inverts the drawing upside down (Y mirroring).
+    • Bit 3 (Palette Selection): 0 = Sprite Palette / Background 0; 1 = Scenery Palette / Background 1.
+    • Bit 4 (Priority): Determines whether the background tile appears in front of or behind sprites.
+
+-------------------------------------------------------------------------------
+CHAPTER 2: THE TEXT ECOSYSTEM AND THE ASCII ILLUSION
+-------------------------------------------------------------------------------
+2.1 The ASCII Illusion and the "Wall of 8" Phenomenon
+In standard computer ASCII, capital 'A' is encoded as hex 0x41 (decimal 65). 
+When an inexperienced programmer opens a Master System ROM in a hex editor and 
+types Western ASCII text, the console renders a chaotic sequence of small "8" numbers.
+Hardware Root Cause:
+    1. The video processor does not read textual characters; it reads Tile Indices in VRAM.
+    2. When localizing Japanese market games (which used Katakana/Hiragana syllabaries), 
+       developers drew the Latin alphabet starting from an arbitrary video index — 
+       conventionally index 0x21 (decimal 33).
+    3. Consequently: Tile 0x21 = 'A'; Tile 0x22 = 'B' ... Tile 0x3A = 'Z'.
+    4. At subsequent post-alphabet indices, Sega drew numbers and status icons.
+    5. At index 0x41 (decimal 65), resided the drawing of the small-font numeral "8".
+    6. Sending ASCII byte 0x41 instructs the VDP: "Draw Tile 65", stamping the number 8 on screen. 
+       This phenomenon is termed The Wall of 8.
+
+2.2 Overcoming Diacritics: The Hybrid Injection Method
+Historically, commercial 90s localizations omitted accents entirely due to high 
+risk of visual corruption in shared VRAM.
+The Newportgame Methodology overcame this via Hybrid Injection:
+    1. High-Frequency Diacritics (1bpp Text Bank): Direct allocation in vacant 
+       indices immediately post-alphabet (Tiles 59 to 62 and 67).
+    2. Secondary Diacritics (Planar RLE Compressed Blocks): When Bank 0's native copy 
+       routine stops at Tile 67, remaining characters are injected into obsolete 
+       punctuation tiles via RAM decompression, pixel art editing, and positive-slack recompression.
+    3. Complete typographical support for Latin languages without reprogramming Bank 0.
+
+2.3 Mathematical Table Discovery (Relative Deltas Method)
+To determine the text encoding of any ROM without source code, Relative Mathematical Search is used:
+The ordinal distance (Delta) between alphabet letters is a universal constant (B - A = 1; C - A = 2). 
+By calculating the delta matrix of known words (e.g., START, PASSWORD, OPTION), 
+an algorithm scans all 256 possible ROM bases until identifying the exact mathematical sequence.
+
+2.4 8x16 Typography, Cell Seams, and Kerning Mathematics (Pixel Breathing Room)
+In advanced graphical interfaces, statuses, scoreboards, and frames frequently utilize 
+large 8x16 pixel fonts composed of two vertically stacked tiles:
+    [Upper Tile (Line Y)] + [Lower Tile (Line Y+1)]
+Fundamental 8x16 Engineering Rules:
+    • Seam Matching: The vertical stroke ending at pixel 7 of the upper matrix MUST begin 
+      at the exact same column as pixel 0 of the lower matrix. Any horizontal offset 
+      creates steps and disjointed letters.
+    • The Kerning Law (Lateral Breathing Room): Each tile cell is 8 pixels wide (0 to 7). 
+      If letter 'A' touches pixel 7 (right edge) and letter 'Q' starts at pixel 0 (left edge), 
+      visual distance is ZERO, fusing them together. To guarantee arcade-grade spacing, 
+      the subsequent letter's matrix MUST keep pixel 0 empty (%01100110 / 0x66), 
+      generating exactly 1 pixel of natural breathing room.
+
+-------------------------------------------------------------------------------
+CHAPTER 3: DYNAMIC MEMORY ENGINEERING (POINTERS, OASIS, AND ORPHANED DATA)
+-------------------------------------------------------------------------------
+3.1 16-Bit Pointer Structure
+Dialogue boxes are rarely sequential in physical memory. The game engine queries 
+a Pointer Table recorded in Z80 Little-Endian format (least significant byte first):
+    Z80 Logical Address: $853A  ==>  Recorded in ROM as: [3A 85]
+
+3.2 The Memory "Oasis" Architecture
+Translating or expanding dialogues increases text volume by 20% to 35%. 
+Forcing new sentences into the tight space of old text causes truncation or machine code corruption.
+The Oasis Solution:
+    1. Identify a continuous, safe ROM area (filled with factory 0xFF or repurposed dead banks).
+    2. Write the new text body linearly in this protected area.
+    3. Universal Slot 2 Logical Pointer Formula:
+       Logical_Pointer = (ROM_Physical_Address - Bank_Physical_Base) + 0x8000
+    4. Redirect the original pointer table so game IDs point directly to the new Oasis coordinates.
+
+3.3 System Message Deduplication
+Many classic engines repeat identical system strings dozens of times (refusal notices, error warnings).
+    • Deduplication Engineering: Record the string once at the Oasis start. Program the 
+      compiler to redirect all duplicate table pointers to that exact physical address. 
+      Recoveries range from 4,000 to 8,000 useful ROM bytes instantly.
+
+3.4 Orphaned Data Archaeology and Factory Debug Stubs
+During commercial localization of 80s Japanese games, developers often summarized 
+dialogues or overlooked translation triggers due to press deadlines:
+    • The Stop Sign ($FC $FF): The Z80 processor reads text bytes until hitting a string terminator. 
+      When shortening dialogue, programmers inserted the terminator before the original phrase ended, 
+      leaving leftover Japanese/English text stranded past the terminator (Orphaned Data).
+    • Debug Stubs (??...?? Pattern): When compilation tools failed to find a specific message 
+      translation, they automatically generated error strings (e.g., '??[HEX_ID]??') to alert QA testers. 
+      In many commercial cartridges, these stubs were forgotten and shipped to factories. 
+      Reverse engineering allows unearthing the original ID and completing the definitive canonical script.
+
+-------------------------------------------------------------------------------
+CHAPTER 4: GRAPHIC PROCESSING AND SEGA'S PLANAR RLE ENGINE
+-------------------------------------------------------------------------------
+4.1 Sega Planar RLE Format (4BPP)
+The VDP operates with 4 bitplanes to generate up to 16 simultaneous colors per pixel. 
+Sega compressed these complex textures and fonts into 4 independent contiguous streams:
+    • Control Byte < 0x80: Run-Length mode. Next stream byte is replicated N times.
+    • Control Byte >= 0x80: Literal mode. Copies next (N & 0x7F) bytes directly uncompressed.
+    • Byte 0x00: Mandatory terminator closing the color plane stream.
+    • Each decompressed plane must match the others in size; total decompressed bytes 
+      divided by 8 yields exact 8x8 tiles recovered.
+
+4.2 In-Place Pixel Art Injection and Positive Slack Rule
+To modify compressed font or graphic matrices:
+    1. Decompress the 4 planes into RAM.
+    2. Modify target tile pixels in corresponding planes.
+    3. Recompress the 4 planes via the canonical Sega Planar RLE algorithm.
+    4. Positive Slack Rule: The newly generated compressed block must be smaller than 
+       or equal to the original factory block size. Remainder slack is padded with 0x00, 
+       maintaining physical offsets and ROM pointers aligned.
+
+-------------------------------------------------------------------------------
+CHAPTER 5: THE MODERN PROGRAMMATIC PIPELINE (THE DEATH OF THE HEX EDITOR)
+-------------------------------------------------------------------------------
+Modifying ROMs via manual hex editors is archaic, unversionable, and error-prone. 
+Modern reverse engineering relies on Automated Pipelines:
+    [Clean Original ROM] ──> [Master Python Compiler (1s)] ──> [Homologated Final ROM]
+
+5.1 The Python Slice Trap and Integrity Lock
+A critical Python bytearray pitfall involves slice assignment behavior:
+    rom[0x40000 : 0x40038] = divergent_size_data
+Python does not zero-pad: it deletes or inserts bytes, shrinking or expanding the file.
+    • Catastrophic Effect: If a 512 KB ROM shrinks by 1 byte, all subsequent banks shift backward. 
+      The Z80 reads corrupted instructions and crashes to a black screen instantly.
+    • Integrity Lock Law: Every compilation must validate cravated size:
+      assert len(rom) == ORIGINAL_SIZE, "ROM corrupted by slice shift!"
+
+-------------------------------------------------------------------------------
+CHAPTER 6: FORENSIC SUITE AND INVESTIGATION METHODS
+-------------------------------------------------------------------------------
+Modern engineering demands standardized forensic methodologies:
+    1. Terrain Recognition: Scanning contiguous empty blocks (0x00/0xFF) bank by bank.
+    2. Relative Mathematical Search: Scanning for deltas in 1-byte linear or 2-byte interleaved VDP formats.
+    3. VDP Loader Autopsy (Anti-Ghost Symbol): Tracking Z80 write instructions to port $BF 
+       ($4000-$7FFF) and mapping register BC to discover ROM source addresses feeding VRAM ranges.
+    4. Interface Tilemap & 2D Window Tracking: Crossing VRAM reads with physical ROM for native HUD/menus.
+    5. Typography Studio 1:1 & 8x16: Terminal rendering in real CRT scale, 8x16 mode, and kerning simulation.
+    6. Planar RLE Texture Hunting: Algorithmic scanner decompressing all graphical blocks into HTML galleries.
+    7. In-Place Graphic Surgery: Decompression, matrix injection, and recompression with automatic slack math.
+    8. Total Language Audit & Stub Hunting: Simultaneous scanning decoding diacritics, 
+       checking exclusion dictionaries, and hunting debug codes (??...??).
+    9. Binary Bisection Fault Isolator: Differential comparator restoring one bank at a time.
+
+-------------------------------------------------------------------------------
+CHAPTER 7: ANTI-CRASH FORENSIC PROTOCOL AND DEBUGGING
+-------------------------------------------------------------------------------
+7.1 Binary Bisection Method
+If a compilation crashes to black screen, scientific protocol vetoes guesswork:
+    1. Generate test ROMs restoring isolated bank ranges to original states.
+    2. The first initializing test ROM fingers the anomaly-causing database bank with absolute precision.
+
+7.2 Advanced Emulicious Debugging
+    • Program Counter (PC) Analysis:
+        ◦ PC = $0000: Forced reset due to illegal opcode or corrupted jump.
+        ◦ Closed Loop (JR NZ, -$02 or $BF polling): CPU awaiting string terminator (e.g. 0xFC 0xFF).
+    • Tools -> Tilemap Viewer / Tile Viewer: Inspect complete VRAM rendering. 
+      "Pixel Source" points to the exact physical ROM address of any tile.
+
+-------------------------------------------------------------------------------
+CHAPTER 8: ADVANCED VRAM ARCHITECTURE, Z80 LOADERS, AND INTERFACE
+-------------------------------------------------------------------------------
+8.1 Shared Interface Tile Traps
+Commercial cartridges often reuse VRAM indices immediately following alphabets for shared interface assets:
+    • Dialogue box corners and border thickness.
+    • Title screen logo shadows and textures.
+    • Selection cursor icons and waiting arrows.
+    • Safety Rule: Never overwrite these tiles without auditing the Name Table.
+
+8.2 Font VRAM Copy Routine Limit and the Phantom Symbol Effect
+The Z80 transfers font blocks from ROM to VRAM via strict repetition-counter loops:
+    LD HL, ROM_Source_Pointer     ; Font matrix pointer in ROM
+    LD DE, VRAM_Destination_Cmd   ; e.g. $6000 | VRAM $2000
+    LD BC, Byte_Quantity          ; Repetition counter (e.g. $0060 = 12 tiles)
+    CALL VRAM_Copy_Routine
+    • Phantom Symbol Effect: Writing new characters in ROM beyond the BC register limit 
+      does not change printed text; the Z80 halts copying early, and VRAM retains old residue. 
+      To inject new characters successfully, locate the exact loader feeding that VRAM range.
+
+8.3 Symmetrical Twin Interface Tables Law (Action vs. Pause HUDs)
+Classic 8-bit engines manage multiple Name Table buffers for different game modes:
+    • Disconnection Trap: Modifying only the Action HUD causes the Pause Menu Name Table 
+      to continue reading Sega's old indices, yielding deformed acronyms and misalignments.
+    • Symmetry Rule: Every structural scoreboard modification (e.g., VIDA/ENER) must be 
+      reflected identically across all twin engine tables.
+
+8.4 Continuous Ending Stream Engineering (Credits and Reset Terminator)
+Vertical scrolling ending sequences interpret sequential bytecode streams:
+    [String_Size] [X_Col / Position] [ASCII_Text] [0xFE_Pauses] ... [FF_00_Terminator]
+    • Spacing Control (\xFE): Each 0xFE byte commands a VBLANK frame pause and line advance. 
+      Double repetition (\xFE\xFE) generates an empty breathing row between roles (elegant double spacing).
+    • Buffer Ceiling and Solemn Opening: Credits buffer has a fixed hardware max size (e.g. 298 bytes). 
+      Factory terminator (FF 00) triggers console reset countdown. To guarantee noble reading time 
+      for authorial localization signatures, place the author block at the TREADMILL OPENING, 
+      allowing clean reading prior to staff scrolling.
+
+-------------------------------------------------------------------------------
+CHAPTER 9: Z80 PHYSICS ENGINEERING, SUBPIXELS, CAMERA, AND ENTITIES
+-------------------------------------------------------------------------------
+9.1 16-Bit Fixed-Point Arithmetic and Subpixels
+Characters and projectiles do not move in integer pixel coordinates. To create smooth 
+accelerations, the Z80 engine operates on 16-bit Fixed-Point:
+    • Register L (Lower Byte): Subpixel Fraction (0 to 255).
+    • Register H (Upper Byte): True Screen Pixel Coordinate (0 to 255).
+    • Register Pair DE: Frame velocity vector.
+    • Displacement Equation: HL_new = HL_old + DE
+    Visible pixel (H) advances only when fractional accumulator (L) overflows 256 ($80 + $80 = $100).
+
+9.2 Camera Equation and Zero Drift Cancellation
+In continuous scrolling stages, when the protagonist hits the deadzone at screen center (e.g., X = 128), 
+camera scrolling begins. Sega implements a cancellation equation in the physics handler:
+    Visible_Advance = Character_Velocity (DE) + Camera_Delta (RAM_Buffer)
+    • Original engine: (+128 subpixels) + (-128 subpixels) = $0000. RET Z terminates calculation.
+    • Acceleration Trap: Doubling character velocity to 2X (+256) while camera buffer remains 
+      1X (-128) results in +128 excess subpixels, causing continuous drift off-screen.
+    • Zero Drift Law: Camera buffer feed rate MUST strictly match protagonist movement velocity.
+
+9.3 Horizontal Range vs. Vertical Jump Law
+Empirical modifications to vertical jump routines frequently cause tunneling or invisibility:
+    • Jump Range Law: Horizontal_Distance = Horizontal_Velocity * Air_Time.
+    • Doubling march horizontal velocity automatically doubles jump horizontal range, 
+      clearing huge gaps without altering gravity or vertical height.
+    • Long Assembly Jump Trap: Injecting long routines with blind relative jumps (JR) 
+      tramples vital sprite-refresh bytes, causing blinking or invisibility. 
+      Vertical impulses must be strictly in-place in exact 3-byte patches (JR Z + ADD HL, DE).
+
+9.4 Tripod Protection (Static Arenas) and Boss Isolation
+In boss battles, cameras lock into static tripod mode without horizontal scrolling:
+    • Sega's original engine implements an isolation flag in its displacement routine 
+      (e.g., LD A, (IX+offset); JR NZ, .pula_camera).
+    • Overwriting this check applies phantom camera offsets to ground-locked players, creating a magnetic pull.
+    • Golden Rule: Static screen isolation must remain intact.
+
+9.5 Dynamic Stage Detection via Mapping Registers
+Master System cartridges use Slot 2 mapping register ($FFFF) to switch stage banks:
+    • Inspecting ($FFFF) in RAM allows Bank 0 physics routines to detect active stages 
+      at runtime, enabling exclusive dynamics (full acceleration, tripod mode) with 100% surgical isolation.
+
+===============================================================================
+               TECHNICAL SIGNATURE AND METHODOLOGY CERTIFICATION
+===============================================================================
+This document consolidates proven hardware and emulation methodology by Newportgame, 
+establishing a universal scientific foundation for Sega 8-Bit preservation, 
+localization, physics, and reverse engineering.
+
+Developed and homologated by: Cristiano Mariano — Newportgame.
+===============================================================================

@@ -1,0 +1,135 @@
+===============================================================================
+               PROTOCOLO MESTRE V15.0: Projeto SpellCaster (SMS) PT-BR
+               VERSÃO BRASILEIRA DEFINITIVA (GOLD MASTER - 100% TRADUZIDA)
+===============================================================================
+Este documento é a "Bíblia Técnica e Única Fonte da Verdade" do projeto de 
+tradução. Ele reúne 100% da arquitetura da ROM, histórico de engenharia reversa, 
+armadilhas superadas de hardware (Z80/VDP), o Sistema dos 11 Acentos e Hífen Nativo, 
+a Fonte de Créditos do Banco 02, o Protocolo do Laboratório Forense e o 
+Pipeline Blindado da Tríade.
+
+Localização e Engenharia Reversa: Cristiano Mariano — Newportgame
+
+-------------------------------------------------------------------------------
+📍 1. MAPEAMENTO TÉCNICO E ARQUITETURA DA ROM
+-------------------------------------------------------------------------------
+* ROM Base: "SpellCaster (USA, Europe).sms" (512 KB / 524.288 bytes / 4 Megabits).
+* ROM Gerada: "SpellCaster (PT-BR).sms" (Tradução Pura - 524.288 bytes CRAVADOS).
+
+* Encoding Customizado de Diálogos e o Sistema dos 11 Acentos + Hífen Oficial:
+  - Base Alfanumérica: A = 0x21 (B=0x22... Z=0x3A, Espaço=0x00, '=0x07, ?=0x1F, !=0x01).
+  - Os 11 Acentos Históricos Homologados:
+    * Á = 0x3B (Tile 59 - Banco 12 1bpp | 0x33980)
+    * Ç = 0x3C (Tile 60 - Banco 12 1bpp | 0x33988)
+    * Ó = 0x3D (Tile 61 - Banco 12 1bpp | 0x33990)
+    * É = 0x3E (Tile 62 - Banco 12 1bpp | 0x33998)
+    * Ê = 0x43 (Tile 67 - Banco 12 1bpp | 0x339C0)
+    * Ã = 0x20 (Tile 32 - Banco 19 Planar RLE | 0x4F35E)
+    * Í = 0x0F (Tile 15 - Banco 19 Planar RLE | 0x4F35E - Clone Dinâmico do Tile 41)
+    * Ú = 0x0B (Tile 11 - Banco 19 Planar RLE | 0x4F35E)
+    * Õ = 0x1B (Tile 27 - Banco 19 Planar RLE | 0x4F35E - Tracinho de ponta a ponta)
+    * Â = 0x1D (Tile 29 - Banco 19 Planar RLE | 0x4F35E)
+    * Ô = 0x0A (Tile 10 - Banco 19 Planar RLE | 0x4F35E - O 11º Acento Oficial!)
+  - O Hífen Nativo Homologado:
+    * '-' = 0x08 (Tile 08 - Banco 19 Planar RLE | Barra de 6px centralizada: 0x7E 0x7E).
+      Elimina espaços duplos e padroniza palavras como BEM-VINDO e JUNTE-SE.
+
+  ⚠️ REGRAS DE OURO DE TEXTO E VRAM:
+     - O byte 0x41 (ASCII 'A') imprime um número "8" pequeno na tela (O Muro do 8).
+     - O byte 0x37 NUNCA deve ser usado como ponto final! 0x37 é a letra 'W'.
+     - O ponto final dos diálogos é desenhado AUTOMATICAMENTE pela tag de pausa <0E>. 
+       Nunca coloque pontuação (!) antes de <0E>, sob pena de gerar "!." na tela.
+     - Reticências Oficiais da Sega: Criadas através da sequência tripla <0E><0E><0E>, 
+       gerando a pausa contínua e solene sem pontos finais quebrados.
+     - Teto de Borda de 17 Colunas: Nenhuma linha em janelas com retrato (<02>) 
+       pode ultrapassar 17 caracteres, sob pena de vazar sobre o rosto do Kane.
+     - Efeito do Símbolo Fantasma: NUNCA injetar pixels em VRAM fora do range lido pelo loader 
+       Z80. Se passar da quantidade do registrador BC, a matriz será ignorada pela placa de vídeo.
+
+* Mapeamento de Memória por Bancos:
+
+  1. BANCO 0 (0x00000 - 0x03FFF) - 100% ORIGINAL DE FÁBRICA DA SEGA:
+     - DESCOBERTA: O Banco 0 possui ZERO bytes de espaço livre (entupido de código).
+     - É TERMINANTEMENTE PROIBIDO criar Hooks Z80 externos ou trampolins para os Slots 1 e 2.
+     - ROTINAS CRÍTICAS NATIVAS DE SISTEMA (LEITURA APENAS):
+       * 0x0375 a 0x03A5: Rotina nativa de descompressão gráfica Planar RLE da Sega.
+     - DIRETRIZ: Na ROM de tradução pura, o Banco 0 permanece 100% PURO e ORIGINAL de fábrica.
+
+  2. BANCO 1 E BANCO 2 (0x04000 - 0x0BFFF): Tela de Título e Fonte dos Créditos Finais:
+     - 0x07AC0 (Banco 1): Tela de título adaptada com "VERS$O BR - NEWPORTGAME".
+     - 0x0B6A3 (Banco 2): A "Gambiarra de Ouro" nas fontes 1bpp do encerramento (ASCII não usados):
+       * É = '#' (Tile 0x03 | 0x0B6BB)
+       * Ã = '$' (Tile 0x04 | 0x0B6C3)  <-- Usado para selar a Tela de Título com "VERSÃO"!
+       * Ç = '%' (Tile 0x05 | 0x0B6CB)
+       * Ê = '&' (Tile 0x06 | 0x0B6D3)
+       * Á = '<' (Tile 0x1C / 28 | 0x0B783)
+
+  3. BANCO 5 (0x14000 - 0x17FFF): Sistema HUD, Menu de Pausa, ATAQ e DEFS:
+     - Tabela de fontes nativas em 0x178E8 a 0x17948 (96 bytes / 12 tiles intocáveis de fábrica).
+     - A Lei das Tabelas Gêmeas do HUD (Sincronia Simétrica entre Ação e Pause):
+       * 0x17A58 / 0x17A60: Tabela da Floresta (VIDA 20 e ENER 20).
+       * 0x17B50 / 0x17B6A / 0x17B9E / 0x17BB8: Tabela do Pause (VIDA 20 e ENER 20 em 4 letras).
+     - Engenharia de Caixas 8x16 do Menu de Pausa:
+       * Caixa 1 (Armas): "ATAQ" cirúrgico. 'T' em pé, e 'Q' com 1px de respiro (Kerning balanceado).
+       * Caixa 2 (Armaduras): "DEFS" homologado (S nativo da Sega restaurado).
+       * Pixels alocados estritamente nos ranges 0x179D0 a 0x17A00 revelados pelo VDP Loader.
+
+  4. BANCO 12 (0x30000 - 0x33FFF): Oásis de Diálogos, Itens e NPCs (100% Restaurado):
+     - Tabela de Ponteiros em 0x30000 (IDs 0 a 260) com recálculo dinâmico.
+     - Área do Oásis em 0x3020B (espaço dinâmico ilimitado para expansão de texto).
+     - Restauração Total das Telas Amputadas pela Sega of America:
+       * Restauradas 10 páginas cruciais (<FC>) de Yomotsu, Barqueiro, Amano, Izanami e Daikak.
+       * Destaque: O Tutorial Sagrado Completo de 11 telas da batalha final (ID 54) reconstruído.
+
+  5. BANCO 17 (0x44000 - 0x47FFF): Epílogo Acentuado e Créditos Cinematográficos:
+     - 0x46546 a 0x46856 (784 bytes): As 14 linhas do Epílogo 100% acentuadas via Banco 02.
+     - 0x46856 a 0x4697E (298 bytes limite): O Fluxo Contínuo de Créditos da Sega:
+       * Formato de cada bloco: [TAMANHO_HEX][POSIÇÃO_Y][TEXTO][PAUSAS_0xFE].
+       * Espaçamento Duplo Homologado (\xFE\xFE) restaurado para separar os cargos com uma linha vazia.
+       * Abertura Solene: "VERSÃO BR: CRISTIANO MARIANO" foi movida para o TOPO da esteira, garantindo tempo total de leitura antes do reset do jogo.
+       * Glitch do ILUMINADOR corrigido: cabeçalho aferido em 0x0A eliminou o pixel fantasma 0xFE.
+
+  6. BANCO 18 (0x48000 - 0x4BFFF): O Motor VDP Loader Z80:
+     - Descoberta Forense: O código de máquina em 0x488FB carrega os gráficos para a VRAM $2380.
+     - Prova incontestável de onde a VDP busca os pixels do Menu de Pausa (Banco 5).
+
+  7. BANCO 19 (0x4EC7E a 0x4F1FE e Bloco RLE 0x4F200+): Menus e Bloco Planar RLE:
+     - Menus de aventura cravados em 16 bytes (8+8). Magia "MARS" padronizada.
+     - Cirurgia Planar RLE (0x4F200 a 0x4F35E): abriga os acentos complementares Ã, Í, Ú, Õ, Â, Ô e o Hífen Nativo (-) no Tile 0x08.
+
+  8. BANCO 24 (0x60000 - 0x63FFF): Cenário Comprimido de Izumo (Yakisoba):
+     - Offset físico 0x6158E. Pixel art Y-A-K-I-S-O-B-A recompactado com folga positiva.
+
+  9. BANCOS 30 E 31 (0x78000 - 0x7FFFF): História Parte 1 e 2 (479 Diálogos):
+     - 100% das falas acentuadas, com todas as linhas calibradas contra vazamento de retrato (max 17 col).
+     - O FIM DO BUG "??07D??": O infame stub de debug esquecido pela Sega americana (Offset 499154 - Templo do Cume) foi exterminado e substituído pelo canônico "NADA PARA PEGAR AQUI.".
+
+-------------------------------------------------------------------------------
+🛡️ 2. O PROTOCOLO DO LABORATÓRIO E AS 4 ETAPAS DE SEGURANÇA (PIPELINE BLINDADO)
+-------------------------------------------------------------------------------
+Fica terminantemente proibido injetar modificações com base em suposições teóricas.
+
+Toda e qualquer melhoria segue o FLUXO DAS 4 ETAPAS OBRIGATÓRIAS:
+
+[ETAPA 0: O LABORATÓRIO FORENSE (laboratorio.py)]
+  • Testes univariados de 1 byte, bisseção binária e geração automática de ROMs isoladas.
+  • É PROIBIDO alterar arquivos de produção sem prova de hardware (Tilemap/Debugger) na Etapa 0.
+
+[ETAPA 1: A BANCADA ATIVA ACUMULATIVA (modificar.py)]
+  • Ambiente controlado de prototipagem e calibração fina em gameplay ativo.
+
+[ETAPA 2: VALIDAÇÃO EM EMULAÇÃO DE ALTA PRECISÃO (Emulicious)]
+  • Teste obrigatório em gameplay real: movimentação, escada, chefes, HUD e esteira de créditos.
+
+[ETAPA 3: CONSOLIDAÇÃO NO COMPILADOR MESTRE GOLD MASTER]
+  • Merge definitivo no Compilador Mestre ('tradutor_mestre_v10.py') via fatiamento de string seguro.
+  • O 'modificar.py' e o 'laboratorio.py' são imediatamente limpos para o próximo ciclo.
+
+-------------------------------------------------------------------------------
+🔁 3. A TRÍADE DE EXECUÇÃO DA TRADUÇÃO PURA
+-------------------------------------------------------------------------------
+Toda sessão de compilação da versão traduzida DEVE executar o fluxo oficial:
+
+```bash
+clear
+python3 tradutor_mestre_v10.py
