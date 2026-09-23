@@ -11,6 +11,13 @@ This repository contains the project's bilingual technical documentation and the
 - [`docs/pt-br/`](docs/pt-br/) — Portuguese technical documentation.
 - [`tools/localization/`](tools/localization/) — Python forensic and localization tools.
 
+## Download
+
+The official **SpellCaster PT-BR v1.0** patch package is available on the
+[GitHub Release page](https://github.com/contatonewportgame-code/spellcaster-sms-ptbr/releases/tag/v1.0.0).
+It contains the IPS patch, `SpellCaster.tbl`, and `LEIA-ME.txt`. The complete ROM
+is not distributed.
+
 ## Documentation
 
 The repository includes two kinds of technical material:

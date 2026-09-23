@@ -11,6 +11,13 @@ Este repositório reúne a documentação técnica bilíngue e as ferramentas Py
 - [`docs/pt-br/`](docs/pt-br/) — documentação técnica em português.
 - [`tools/localization/`](tools/localization/) — ferramentas forenses e de localização em Python.
 
+## Download
+
+O pacote oficial do patch **SpellCaster PT-BR v1.0** está disponível na
+[página da Release no GitHub](https://github.com/contatonewportgame-code/spellcaster-sms-ptbr/releases/tag/v1.0.0).
+Ele contém o patch IPS, o `SpellCaster.tbl` e o `LEIA-ME.txt`. A ROM completa
+não é distribuída.
+
 ## Documentação
 
 O repositório reúne dois tipos de material técnico:
