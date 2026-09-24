@@ -1,0 +1,143 @@
+===============================================================================
+       AGENT'S OPERATIONAL PLAYBOOK: SEGA MASTER SYSTEM REVERSE ENGINEERING (V5.0)
+               LOCALIZATION, TEXT, INTERFACE, AND GRAPHICS SUITE GUIDE
+===============================================================================
+Technical Manual and Forensic Suite Execution Guide for Sega Master System (8-Bit)
+Author and Chief Engineer: Cristiano Mariano — Newportgame
+Status: Homologated on Real Hardware and Cycle-Accurate Emulation (Gold Master)
+Scope: Localization, VRAM Engineering, Typography, Menus, and Pixel Art
+
+THIS DOCUMENT IS THE TECHNICAL MANUAL FOR THE 12 OFFICIAL LOCALIZATION TOOLS.
+
+===============================================================================
+               🧰 OFFICIAL CATALOG OF THE 12 LOCALIZATION TOOLS
+===============================================================================
+
+1. sms_free_space_finder.py
+   • Function: Scans all 16 KB ROM banks hunting for contiguous empty blocks (0x00 or 0xFF).
+   • Purpose: Map safe areas for dialogue Oasis creation and validate the Bank 0 Red Line 
+     (ensuring it has strictly 0 free bytes).
+   • Command: $ python3 sms_free_space_finder.py "ROM.sms"
+
+2. sms_math_text_search.py
+   • Function: Relative mathematical search for ordinal deltas across all 256 possible bases.
+   • Modes:
+     - Mode 1 (1 Byte): Contiguous linear text (discovers custom 'A' base).
+     - Mode 2 (2 Bytes): VDP Name Table format (interleaved Tile ID + Attribute).
+   • Command: $ python3 sms_math_text_search.py "ROM.sms" "WORD"
+
+3. sms_vram_tilemap_tracer.py (v2.0)
+   • Function: Advanced interface table tracker (VDP Tilemap in physical ROM).
+   • Features v2.0: Support for 2D window searching, wildcard masks (?), and direct correlation 
+     with Emulicious VRAM reads.
+   • Purpose: Map exact offsets of HUD scoreboards (HP/MP) and box titles (ATAQ/DEFS).
+   • Command: $ python3 sms_vram_tilemap_tracer.py "ROM.sms"
+
+4. sms_vdp_loader_hunter.py (v1.0) [NEW LOCALIZATION TOOL]
+   • Function: Hunter for Z80 VDP transfer routines and font bank mappers.
+   • Purpose: Exterminate the "Phantom Symbol Effect" (Compendium Chapter 8.2). Maps which 
+     ROM block feeds each VRAM range ($2000+) and denounces the exact byte count (LD BC).
+   • Command: $ python3 sms_vdp_loader_hunter.py "ROM.sms"
+
+5. sms_font_patcher.py (v4.0)
+   • Function: Forensic typography studio for 1bpp (1-bit) and 4bpp (4-bit) fonts.
+   • Features v4.0:
+     - Arrangement 8x16 Mode: Stacks top and bottom tiles in real-time in the terminal.
+     - Kerning Simulator: Evaluates lateral pixel spacing between letters (e.g., space between A and Q).
+   • Purpose: Design, evaluate, and inject font matrices without visual distortions.
+   • Command: $ python3 sms_font_patcher.py
+
+6. sms_graphic_hunter.py
+   • Function: Algorithmic scanner that hunts and decompresses all Planar RLE blocks in the ROM.
+   • Output: Generates an interactive HTML Visual Gallery with pixelated rendering.
+   • Purpose: Locate Japanese signs (Yakisoba), scenery textures, and compressed fonts.
+   • Command: $ python3 sms_graphic_hunter.py "ROM.sms"
+
+7. sms_planar_rle_patcher.py
+   • Function: Surgical codec for Sega compressed textures and fonts (4BPP).
+   • Operation: Decompresses the 4 planes in RAM, injects pixel art matrices, recompresses, 
+     and validates the Positive Slack Rule (padding remainder with 0x00 bytes).
+   • Command: $ python3 sms_planar_rle_patcher.py
+
+8. sms_auditor_bordas.py
+   • Function: Geometry auditor for dialogue boxes and portrait frames.
+   • Operation: Measures the true length of each visible text line (ignoring control tags). 
+     Emits a warning if any line exceeds the strict 17-column ceiling.
+   • Purpose: Prevent text from spilling over character portraits.
+   • Command: $ python3 sms_auditor_bordas.py
+
+9. sms_auditor_integridade_narrativa.py
+   • Function: Deep differential comparator between Sega's original ROM and the translation.
+   • Operation: Compares screen-by-screen (<FC>) and word density across all banks.
+   • Purpose: Identify and prevent entire pages or essential hints from being amputated.
+   • Command: $ python3 sms_auditor_integridade_narrativa.py
+
+10. sms_pente_fino.py (v4.0)
+    • Function: Total language auditor and hunter for forgotten factory debug stubs.
+    • Features v4.0:
+      - Anti-Stub Detector: Hunts QA error patterns left behind by the factory (like '??07D??').
+      - Support for '$' as 'Ã' in ASCII texts (Bank 2 and Title Screen).
+      - Decoding of the 11 official accents and native hyphen (-) against 130+ English terms.
+    • Command: $ python3 sms_pente_fino.py "ROM.sms"
+
+11. sms_pente_fino_sintatico.py
+    • Function: Syntactic and editorial dialogue auditor.
+    • Operation: Hunts hidden double spaces of unmapped characters, truncated words, 
+      and missing prepositions or articles.
+    • Command: $ python3 sms_pente_fino_sintatico.py
+
+12. sms_diagnostico_crash.py
+    • Function: Forensic anti-crash isolator via binary bank bisection.
+    • Operation: Generates test ROMs restoring isolated memory ranges to identify 
+      which database bank caused a black screen crash in seconds.
+    • Command: $ python3 sms_diagnostico_crash.py
+
+===============================================================================
+                🧭 EXECUTION FLOW: THE 7 LOCALIZATION PHASES
+===============================================================================
+
+[PHASE 1: TERRAIN RECOGNITION AND MEMORY MAP]
+  Step 1: 'sms_free_space_finder.py' ➔ Map free blocks (Oasis) and audit Bank 0 
+          (prohibited from injecting new code where there are 0 free bytes).
+  Step 2: Validate strict integrity check in every compilation (assert len(rom) == 524288).
+
+[PHASE 2: TEXT TABLE DISCOVERY (ENCODING)]
+  Step 1: 'sms_math_text_search.py' (Mode 1) ➔ Discover custom linear alphabet base (A = 0x21).
+  Step 2: 'sms_math_text_search.py' (Mode 2) ➔ Locate VDP Name Table format tables in the ROM.
+
+[PHASE 3: VRAM AUTOPSY, Z80 LOADERS, AND INTERFACE]
+  Step 1: 'sms_vdp_loader_hunter.py' ➔ Identify the Z80 routine loading VRAM ($2000+) and 
+          map the exact byte count limit (terminates the Phantom Symbol Effect before altering pixels).
+  Step 2: 'sms_vram_tilemap_tracer.py' (v2.0) ➔ Locate window and frame Name Table tables 
+          (Symmetrical synchronization of Twin HUD Tables: Action x Pause).
+
+[PHASE 4: FONT ENGINEERING, 8x16, AND DIACRITICS]
+  Step 1: 'sms_font_patcher.py' (v4.0) ➔ Evaluate matrices at 1:1 scale, stack 8x16 letters 
+          (top and base), and simulate horizontal kerning (1-pixel breathing room between letters).
+  Step 2: Hybrid Accent Injection: Diacritics in Bank 12 (1bpp), Bank 19 (Planar RLE), 
+          and Bank 02 (ASCII '$' for 'Ã' in credits and title screen).
+
+[PHASE 5: SCENERY GRAPHICS SURGERY (PLANAR RLE)]
+  Step 1: 'sms_graphic_hunter.py' ➔ Inspect HTML visual gallery to find signs and kanjis.
+  Step 2: 'sms_planar_rle_patcher.py' ➔ Decompress 4 planes, inject pixel art, and recompress 
+          validating the Positive Slack Rule (padding remainder with 0x00).
+
+[PHASE 6: NARRATIVE AUDIT, GEOMETRY, AND FINE-COMB]
+  Step 1: 'sms_auditor_bordas.py' ➔ Zero any line exceeding the 17-column portrait ceiling.
+  Step 2: 'sms_auditor_integridade_narrativa.py' ➔ Ensure 100% restoration of amputated screens (<FC>).
+  Step 3: 'sms_pente_fino.py' (v4.0) ➔ Hunt English words and exterminate debug stubs (??..??).
+  Step 4: 'sms_pente_fino_sintatico.py' ➔ Zero hidden double spaces and editorial anomalies.
+
+[PHASE 7: FAULT ISOLATION AND GOLD MASTER HOMOLOGATION]
+  Step 1: If black screen occurs, run 'sms_diagnostico_crash.py' to isolate the culprit bank.
+  Step 2: Visual cycle-accurate emulation validation in Emulicious (Tilemap Viewer + VRAM inspect).
+  Step 3: Definitive merge into Master Compiler ('tradutor_mestre_v10.py').
+
+===============================================================================
+              TECHNICAL SIGNATURE AND METHODOLOGY CERTIFICATION
+===============================================================================
+This Playbook consolidates the definitive scientific workflow for translation, 
+localization, and interface engineering on the Sega Master System platform.
+
+Author and Developer: Cristiano Mariano — Newportgame.
+===============================================================================
